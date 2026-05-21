@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./atex.db"
+}
+
+// Agent (交易参与方)
+model Agent {
+  id           String   @id @default(cuid())
+  did          String   @unique                    // DID 标识符
+  name         String?
+  phiMagnitude Float    @default(0)               // Φ 值模长
+  phiPhase     Float    @default(0)                // Φ 值相位(弧度)
+  reputation   Float    @default(1.0)              // 信誉分
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tokens     Token[]
+  offersSent Offer[]   @relation("Offerer")
+  offersRecv Offer[]   @relation("Receiver")
+}
+
+// Token (SQLite不支持enum，使用String + 应用层校验)
+// type: CALC | WIT | WORD | PASS
+// status: NULL | ISSUED | ACTIVE | LOCKED | CONSUMED | SETTLED | RECYCLED
+model Token {
+  id           String   @id @default(cuid())
+  type         String                            // Token类型: CALC/WIT/WORD/PASS
+  status       String   @default("ACTIVE")       // 状态: NULL/ISSUED/ACTIVE/LOCKED/CONSUMED/SETTLED/RECYCLED
+  amount       Float                             // 数量
+  phiMagnitude Float    @default(0)               // 该Token的Φ模长
+  phiPhase     Float    @default(0)               // 该Token的Φ相位
+  ownerDid     String                             // 持有者DID
+  offerId      String?                            // 关联Offer(临时Token)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  agent Agent @relation(fields: [ownerDid], references: [did])
+}
+
+// Offer (交易报价)
+// offerTokenType/reqTokenType: CALC/WIT/WORD/PASS
+// gatewayLevel: PRIORITY/NORMAL/THROTTLE/REJECT
+// status: OPEN/ACCEPTED/CANCELLED/EXPIRED/SETTLED
+model Offer {
+  id              String    @id @default(cuid())
+  offererDid      String                           // 发起方DID
+  receiverDid     String?                          // 接收方DID(可选，空=公开)
+  offerTokenType  String                           // 提供的Token类型
+  offerAmount     Float                            // 提供数量
+  reqTokenType    String                           // 请求的Token类型
+  reqAmount       Float                            // 请求数量
+  phiDiff         Float?                           // Φ值相位差
+  jitterImpact    Float?                           // Jitter滑点影响
+  gatewayLevel    String    @default("NORMAL")     // Φ-Gateway决策
+  status          String    @default("OPEN")       // Offer状态
+  expiresAt       DateTime                         // 过期时间
+  activityId      String?                          // ActivityPub Activity ID
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  offerer      Agent        @relation("Offerer", fields: [offererDid], references: [did])
+  receiver     Agent?       @relation("Receiver", fields: [receiverDid], references: [did])
+  transactions Transaction[]
+}
+
+// Transaction (交易记录)
+// type: PHASE_ENTANGLE | TOPOLOGICAL_TRANSITION | PHASE_RELAXATION
+// tokenType: CALC/WIT/WORD/PASS
+model Transaction {
+  id          String   @id @default(cuid())
+  offerId     String
+  type        String                             // 交易类型
+  fromDid     String
+  toDid       String
+  tokenType   String                             // Token类型
+  amount      Float
+  phiBefore   Float?                             // 交易前Φ值
+  phiAfter    Float?                             // 交易后Φ值
+  zkProofHash String?                            // ZK-Proof哈希(全息边界存储)
+  createdAt   DateTime @default(now())
+
+  offer Offer @relation(fields: [offerId], references: [id])
+}
