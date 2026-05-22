@@ -3,7 +3,10 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
+import { Toaster } from 'react-hot-toast';
 import App from './App';
+import { AuthProvider } from './contexts/AuthContext';
+import { WalletProvider } from './contexts/WalletContext';
 import './index.css';
 
 /** ATEX 深色主题 */
@@ -67,7 +70,21 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
       <BrowserRouter>
-        <App />
+        <AuthProvider>
+          <WalletProvider>
+            <App />
+            <Toaster
+              position="bottom-right"
+              toastOptions={{
+                style: {
+                  background: '#1f2937',
+                  color: '#e5e7eb',
+                  border: '1px solid #374151',
+                },
+              }}
+            />
+          </WalletProvider>
+        </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
   </React.StrictMode>

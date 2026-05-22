@@ -363,3 +363,79 @@ export interface HoloboundaryRecord {
   timestamp: Date;
   blockSize: number;
 }
+
+// ============================================================
+// V2 认证 & 钱包类型
+// ============================================================
+
+/** 钱包类型 */
+export enum WalletType {
+  CUSTODIAL = 'CUSTODIAL',       // 托管钱包
+  THRESHOLD = 'THRESHOLD',       // 门限钱包
+  SELF_CUSTODY = 'SELF_CUSTODY', // 自托管钱包
+}
+
+/** 认证方式 */
+export enum AuthMethod {
+  WEBAUTHN = 'WEBAUTHN',   // 生物识别/Passkey
+  JWT = 'JWT',             // JWT Token
+  API_KEY = 'API_KEY',     // API Key
+  DEV = 'DEV',             // 开发模式
+}
+
+/** API Key 权限 */
+export enum ApiKeyPermission {
+  OFFER_READ = 'offer:read',
+  OFFER_WRITE = 'offer:write',
+  BALANCE_READ = 'balance:read',
+  WALLET_READ = 'wallet:read',
+  WALLET_WRITE = 'wallet:write',
+  AGENT_READ = 'agent:read',
+  AGENT_WRITE = 'agent:write',
+  ALL = '*',
+}
+
+/** 认证响应 */
+export interface AuthResponse {
+  verified: boolean;
+  agent: {
+    id: string;
+    did: string;
+    name: string;
+    walletType: string | null;
+  };
+  tokens: {
+    accessToken: string;
+    refreshToken: string;
+  };
+}
+
+/** 钱包信息 */
+export interface WalletInfo {
+  id: string;
+  type: WalletType;
+  address: string;
+  isActive: boolean;
+  config: Record<string, unknown> | null;
+  createdAt: Date;
+}
+
+/** Agent 批量执行请求 */
+export interface AgentBatchRequest {
+  steps: Array<{
+    action: 'create_offer' | 'accept_offer' | 'cancel_offer' | 'query';
+    params: Record<string, unknown>;
+    id: string;
+  }>;
+}
+
+/** Agent 批量执行响应 */
+export interface AgentBatchResponse {
+  results: Array<{
+    id: string;
+    success: boolean;
+    data?: unknown;
+    error?: string;
+  }>;
+  stepResults: Record<string, unknown>;
+}

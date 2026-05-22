@@ -16,6 +16,14 @@ import historyRoutes from './api/routes/history.routes';
 import { cleanupExpiredOffers } from './models/offer.model';
 import { getFederationStatus } from './federation/liuRouter';
 import { getHoloboundaryStats } from './consensus/holoboundaryStore';
+import { cleanupExpiredSessions } from './auth/jwt.service';
+
+// V2 新增路由
+import authRoutes from './api/routes/auth.routes';
+import walletRoutes from './api/routes/wallet.routes';
+import agentRoutes from './api/routes/agent.routes';
+import apikeyRoutes from './api/routes/apikey.routes';
+import streamRoutes, { getConnectedClients } from './api/routes/stream.routes';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -44,7 +52,9 @@ app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
     service: 'ATEX - AgentWeb Token Exchange',
-    version: '1.0.0',
+    version: '2.0.0',
+    auth: { webAuthn: true, jwt: true, apiKey: true },
+    sseClients: getConnectedClients(),
     federation,
     holoboundary: {
       totalRecords: holoboundary.totalRecords,
@@ -54,12 +64,19 @@ app.get('/health', (_req, res) => {
   });
 });
 
-// API 路由
+// API 路由 — V1 (原有)
 app.use(`${API_PREFIX}/offer`, offerRoutes);
 app.use(`${API_PREFIX}/accept`, acceptRoutes);
 app.use(`${API_PREFIX}/cancel`, cancelRoutes);
 app.use(`${API_PREFIX}/orderbook`, orderbookRoutes);
 app.use(`${API_PREFIX}/history`, historyRoutes);
+
+// API 路由 — V2 新增
+app.use(`${API_PREFIX}/auth`, authRoutes);
+app.use(`${API_PREFIX}/wallet`, walletRoutes);
+app.use(`${API_PREFIX}/agent`, agentRoutes);
+app.use(`${API_PREFIX}/apikey`, apikeyRoutes);
+app.use(`${API_PREFIX}/stream`, streamRoutes);
 
 // 状态 API
 app.get(`${API_PREFIX}/status`, async (_req, res) => {
@@ -144,6 +161,18 @@ setInterval(async () => {
     console.error('[Cleanup] 清理过期 Offer 失败:', error);
   }
 }, OFFER_CLEANUP_INTERVAL);
+
+// 定期清理过期 Session
+setInterval(async () => {
+  try {
+    const count = await cleanupExpiredSessions();
+    if (count > 0) {
+      console.log(`[Cleanup] 清理了 ${count} 个过期 Session`);
+    }
+  } catch (error) {
+    console.error('[Cleanup] 清理过期 Session 失败:', error);
+  }
+}, 60 * 60 * 1000); // 每小时
 
 // ============================================================
 // 启动服务器

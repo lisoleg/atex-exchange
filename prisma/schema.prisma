@@ -15,12 +15,20 @@ model Agent {
   phiMagnitude Float    @default(0)               // Φ 值模长
   phiPhase     Float    @default(0)                // Φ 值相位(弧度)
   reputation   Float    @default(1.0)              // 信誉分
+  walletType   String?                              // CUSTODIAL | THRESHOLD | SELF_CUSTODY
+  walletConfig String?                              // JSON: 钱包配置
+  webauthnId   String?  @unique                    // WebAuthn credential ID
+  publicKey    String?                              // 公钥
+  lastLoginAt  DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  tokens     Token[]
-  offersSent Offer[]   @relation("Offerer")
-  offersRecv Offer[]   @relation("Receiver")
+  tokens       Token[]
+  offersSent   Offer[]   @relation("Offerer")
+  offersRecv   Offer[]   @relation("Receiver")
+  sessions     Session[]
+  apiKeys      ApiKey[]
+  wallets      Wallet[]
 }
 
 // Token (SQLite不支持enum，使用String + 应用层校验)
@@ -84,4 +92,51 @@ model Transaction {
   createdAt   DateTime @default(now())
 
   offer Offer @relation(fields: [offerId], references: [id])
+}
+
+// Session (认证会话)
+model Session {
+  id           String   @id @default(cuid())
+  agentId      String                             // Agent.id
+  token        String   @unique                   // JWT access token hash
+  refreshToken String?  @unique                   // JWT refresh token hash
+  walletType   String?                             // 登录时钱包类型
+  deviceInfo   String?                             // UA + IP
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id])
+}
+
+// ApiKey (Agent API 密钥)
+model ApiKey {
+  id           String    @id @default(cuid())
+  agentId      String                              // Agent.id
+  name         String                              // API Key 名称
+  keyHash      String    @unique                   // SHA-256(apiKey)
+  keyPrefix    String                              // 显示前8位: "atex_sk_..."
+  permissions  String    @default("[]")            // JSON: ["offer:read","offer:write",...]
+  rateLimit    Int       @default(1000)            // 每分钟请求数
+  isActive     Boolean   @default(true)
+  lastUsedAt   DateTime?
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  agent Agent @relation(fields: [agentId], references: [id])
+}
+
+// Wallet (多钱包)
+model Wallet {
+  id           String   @id @default(cuid())
+  agentId      String                             // Agent.id
+  type         String                             // CUSTODIAL | THRESHOLD | SELF_CUSTODY
+  address      String   @unique                   // 钱包地址 (did:key:z...)
+  encryptedKey String?                             // 加密私钥(仅托管钱包)
+  shares       String?                             // JSON: TSS 分片元数据(仅门限钱包)
+  config       String?                             // JSON: 钱包配置
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  agent Agent @relation(fields: [agentId], references: [id])
 }
