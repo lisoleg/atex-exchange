@@ -1,6 +1,6 @@
 # INSTALL.md — AgentWeb Token 交易所安装部署指南
 
-> 基于太乙AGI统一场论 · ATEX V2 全栈数字资产交易所
+> 基于太乙AGI统一场论 · ATEX V3.1 全栈数字资产交易所
 
 ---
 
@@ -12,7 +12,8 @@
 4. [启动服务](#启动服务)
 5. [验证安装](#验证安装)
 6. [生产部署](#生产部署)
-7. [常见问题](#常见问题)
+7. [API 端点一览](#api-端点一览)
+8. [常见问题](#常见问题)
 
 ---
 
@@ -40,7 +41,7 @@
 ### 1. 克隆仓库
 
 ```bash
-git clone https://github.com/your-org/atex-exchange.git
+git clone https://github.com/lisoleg/atex-exchange.git
 cd atex-exchange
 ```
 
@@ -49,6 +50,17 @@ cd atex-exchange
 ```bash
 npm install
 ```
+
+**核心依赖：**
+
+| 包名 | 版本 | 用途 |
+|------|------|------|
+| express | 5.x | REST API 框架 |
+| @prisma/client | 6.x | ORM |
+| @simplewebauthn/server | 13.x | WebAuthn / Passkey |
+| jsonwebtoken | 9.x | JWT 双 Token |
+| complex.js | 2.x | 复数运算 |
+| mathjs | 13.x | 数学工具 |
 
 ### 3. 安装前端依赖
 
@@ -79,6 +91,15 @@ PHI_GATEWAY_LOG_LEVEL=info
 
 # 刘路由表开关（true | false）
 LIU_ROUTER_ENABLED=true
+
+# JWT 密钥（生产环境必须设置）
+JWT_SECRET=your-secret-key-here
+JWT_REFRESH_SECRET=your-refresh-secret-here
+
+# WebAuthn 配置
+WEBAUTHN_RP_ID=localhost
+WEBAUTHN_RP_NAME=ATEX Exchange
+WEBAUTHN_ORIGIN=http://localhost:5173
 ```
 
 ---
@@ -100,6 +121,20 @@ npx prisma migrate dev --name init
 npx prisma studio
 # 访问 http://localhost:5555
 ```
+
+### 数据库模型
+
+| 模型 | 用途 | 版本 |
+|------|------|------|
+| Agent | 用户/Agent 身份 | V3 |
+| Session | JWT 会话管理 | V3 |
+| ApiKey | API Key 认证 | V3 |
+| Wallet | 多钱包管理 | V3 |
+| Delegation | 碳硅纠缠委托 | V3 |
+| DelegationAuditLog | 委托审计日志 | V3 |
+| Token | 四元Token（Calc/Wit/Word/Pass） | V1 |
+| Offer | 交易报价 | V1 |
+| Transaction | 交易记录 | V1 |
 
 ### 数据库文件位置
 
@@ -173,7 +208,19 @@ curl http://localhost:3001/api/health
 # 预期输出：{ "status": "ok", "timestamp": "..." }
 ```
 
-### 2. 运行单元测试
+### 2. TypeScript 编译检查
+
+```bash
+# 后端
+npx tsc --noEmit
+# 预期：0 错误
+
+# 前端
+cd frontend && npx tsc --noEmit
+# 预期：0 错误
+```
+
+### 3. 运行单元测试
 
 ```bash
 npx vitest run
@@ -194,7 +241,7 @@ npx vitest run
       Tests  113 passed (113)
 ```
 
-### 3. 前端构建验证
+### 4. 前端构建验证
 
 ```bash
 cd frontend
@@ -278,8 +325,94 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
     }
+
+    # SSE 事件流（需关闭缓冲）
+    location /api/v1/stream {
+        proxy_pass http://localhost:3001;
+        proxy_set_header Connection '';
+        proxy_http_version 1.1;
+        chunked_transfer_encoding off;
+        proxy_buffering off;
+        proxy_cache off;
+    }
 }
 ```
+
+---
+
+## API 端点一览
+
+### 核心交易 API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/offer` | 创建报价 |
+| POST | `/api/accept/:offerId` | 接受报价 |
+| POST | `/api/cancel/:offerId` | 取消报价 |
+| GET | `/api/orderbook` | 查询订单簿 |
+| GET | `/api/history` | 查询历史交易 |
+
+### 认证 API (V3)
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/auth/register-options` | WebAuthn 注册选项 |
+| POST | `/api/v1/auth/register` | 注册 + 登录 |
+| POST | `/api/v1/auth/login-options` | WebAuthn 登录选项 |
+| POST | `/api/v1/auth/login` | WebAuthn 登录 |
+| POST | `/api/v1/auth/dev-login` | 开发模式登录 |
+| POST | `/api/v1/auth/refresh` | 刷新 JWT |
+| POST | `/api/v1/auth/logout` | 注销 |
+| GET | `/api/v1/auth/me` | 当前用户信息 |
+
+### 钱包 API (V3)
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/wallet` | 列出钱包 |
+| POST | `/api/v1/wallet/create` | 创建钱包 |
+| PUT | `/api/v1/wallet/migrate` | 迁移钱包类型 |
+| POST | `/api/v1/wallet/backup` | 导出备份 |
+| GET | `/api/v1/wallet/balance` | 钱包余额 |
+
+### Agent SDK API (V3)
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/agent/execute` | Agent 批量执行（依赖链） |
+| POST | `/api/v1/agent/negotiate` | A2A 协商 |
+| POST | `/api/v1/agent/delegate` | 委托 AI 代理 |
+| POST | `/api/v1/agent/prove` | 交易加密证明 |
+| GET | `/api/v1/agent/capabilities` | Agent 能力查询 |
+| GET | `/api/v1/agent/stream` | SSE 事件流 |
+| POST | `/api/v1/apikey` | 创建 API Key |
+| GET | `/api/v1/apikey` | 列出 API Key |
+| DELETE | `/api/v1/apikey/:id` | 吊销 API Key |
+| GET | `/api/v1/stream` | 全局 SSE 流 |
+
+### x402 支付 + KYA 信用 API (V3)
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/payment/verify` | x402 支付验证 |
+| POST | `/api/v1/payment/settle` | x402 支付结算 |
+| GET | `/api/v1/payment/routes` | x402 付费路由列表 |
+| GET | `/api/v1/kya/credit` | KYA 信用报告 |
+| GET | `/api/v1/kya/credit/:did` | 查询他人信用 |
+
+### V3.1 撮合引擎 API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/matching/find/:offerId` | 查找撮合对手 |
+| POST | `/api/matching/batch` | 批量撮合 |
+| GET | `/api/matching/adaptive-tolerance` | 自适应容差 |
+| GET | `/api/matching/index/stats` | Phase Index 统计 |
+| GET | `/api/matching/dag/stats` | DAG 共识统计 |
+| GET | `/api/matching/calibrator/stats` | 相变校准器统计 |
+| GET | `/api/matching/scalability/stats` | 可扩展路由器统计 |
+| GET | `/api/matching/optimizer/stats` | 三旋优化器统计 |
+| GET | `/api/matching/privacy/stats` | 隐私 Φ 统计 |
 
 ---
 
@@ -345,7 +478,38 @@ app.use('/api', phiGatewayMiddleware);
 
 ---
 
-### Q5: 前端 `npm run dev` 卡住或端口被占用
+### Q5: WebAuthn 注册失败
+
+**原因：** WebAuthn 需要 HTTPS 或 localhost 环境。
+
+**解决：**
+
+1. 开发环境使用 `localhost`（浏览器会自动信任）
+2. 生产环境必须配置 HTTPS（Nginx + Let's Encrypt）
+3. 检查 `.env` 中的 `WEBAUTHN_RP_ID` 和 `WEBAUTHN_ORIGIN` 配置
+
+---
+
+### Q6: SSE 事件流不工作
+
+**原因：** Nginx 默认缓冲 SSE 响应。
+
+**解决：** 在 Nginx 配置中添加：
+
+```nginx
+location /api/v1/stream {
+    proxy_pass http://localhost:3001;
+    proxy_set_header Connection '';
+    proxy_http_version 1.1;
+    chunked_transfer_encoding off;
+    proxy_buffering off;
+    proxy_cache off;
+}
+```
+
+---
+
+### Q7: 前端 `npm run dev` 卡住或端口被占用
 
 ```bash
 # 查看占用 5173 端口的进程
@@ -359,7 +523,7 @@ npm run dev -- --port 5174
 
 ---
 
-### Q6: 单元测试部分失败
+### Q8: 单元测试部分失败
 
 ```bash
 # 清除 vitest 缓存
@@ -371,33 +535,58 @@ npx vitest run tests/math/emlPhi.test.ts
 
 ---
 
+### Q9: Prisma 返回的 enum 字段类型不匹配
+
+**原因：** Prisma + SQLite 不支持 enum，使用 String 存储但 TypeScript 类型为应用层枚举。
+
+**解决：** 需要显式类型断言：
+
+```typescript
+// 错误：Type 'string' is not assignable to type 'TokenType'
+const tokenType = token.tokenType as TokenType;
+
+// Zod z.enum() 解析后也需要断言
+const parsed = TokenTypeSchema.parse(raw) as TokenType;
+```
+
+---
+
 ## 项目目录结构
 
 ```
 atex-exchange/
 ├── prisma/                  # 数据库 Schema + 迁移
-│   ├── schema.prisma        #   Prisma Schema 定义
+│   ├── schema.prisma        #   含 Agent/Session/ApiKey/Wallet/Delegation 等模型
 │   ├── dev.db              #   SQLite 数据库（自动生成）
 │   └── migrations/         #   迁移历史
-├── src/                     # 后端源码
+├── src/                     # 后端源码（58 个模块）
 │   ├── index.ts            #   Express 入口
-│   ├── api/                #   API 路由 + 中间件
-│   ├── math/               #   数学引擎（Φ-值、O-U、三旋...）
-│   ├── core/               #   核心算法（相位缠绕、拓扑相变...）
-│   ├── gateway/            #   Φ-Gateway 决策引擎
-│   ├── federation/         #   联邦学习（ActivityPub）
-│   ├── consensus/          #   共识引擎（TAI、碳硅网络）
-│   ├── models/             #   Prisma 数据模型
+│   ├── api/                #   API 路由 + 中间件（16 个路由文件）
+│   ├── math/               #   数学引擎（9 个模块，含 V3.1 新增 3 个）
+│   ├── core/               #   核心算法（3 个模块）
+│   ├── matching/           #   撮合引擎（2 个模块，V3.1 新增）
+│   ├── dag/                #   DAG 共识（1 个模块，V3.1 新增）
+│   ├── gateway/            #   Φ-Gateway 决策引擎（4 个模块）
+│   ├── auth/               #   认证服务（2 个模块，V3 新增）
+│   ├── wallet/             #   钱包服务（4 个模块，V3 新增）
+│   ├── payment/            #   x402 支付（3 个模块，V3 新增）
+│   ├── kya/                #   KYA 信用（1 个模块，V3 新增）
+│   ├── federation/         #   联邦学习（5 个模块，含 V3.1 可扩展路由）
+│   ├── consensus/          #   共识引擎（3 个模块）
+│   ├── models/             #   Prisma 数据模型（3 个模块）
 │   ├── types/              #   TypeScript 类型定义
 │   └── config/             #   运行配置
 ├── frontend/               # 前端（React + MUI + Recharts）
 │   ├── src/
-│   │   ├── components/    #   组件（Layout、OfferForm...）
-│   │   ├── pages/         #   页面（Dashboard、Trade...）
-│   │   ├── hooks/         #   Custom Hooks
+│   │   ├── components/    #   12 个组件（含 AuthGuard/ErrorBoundary/SkeletonCard）
+│   │   ├── contexts/      #   2 个 Context（Auth/Wallet）
+│   │   ├── pages/         #   10 个页面（含 Login/Wallet/AgentApi/NotFound）
+│   │   ├── hooks/         #   3 个 Hooks（含 useEventSource）
 │   │   └── utils/         #   工具函数
 │   └── dist/              #   生产构建输出
-├── tests/                  # 单元测试（Vitest）
+├── tests/                  # 单元测试（Vitest，7 文件 113 项）
+├── docs/                   # 学术论文
+│   └── atex-paper-zh.md   #   设计与实现（8 章）
 ├── package.json           # 后端依赖
 ├── tsconfig.json          # TypeScript 配置
 └── vitest.config.ts       # Vitest 配置
@@ -412,11 +601,14 @@ atex-exchange/
 | 后端框架 | Express 5 + TypeScript | REST API |
 | 数据库 ORM | Prisma 6 | SQLite / PostgreSQL |
 | 数据库 | SQLite（开发）/ PostgreSQL（生产） | 数据持久化 |
-| 数学引擎 | 自研（Φ-值复数运算、O-U 均值回归、三旋风控） | 交易核心算法 |
+| 认证 | @simplewebauthn/server 13 + jsonwebtoken 9 | WebAuthn + JWT |
+| 加密 | AES-256-GCM + MPC-TSS 模拟 | 钱包安全 |
+| 数学引擎 | 自研 + complex.js + mathjs | Φ-值运算、三旋风控 |
 | 前端框架 | React 18 + TypeScript | SPA |
-| UI 组件库 | MUI (Material-UI) v5 | 暗色主题界面 |
+| UI 组件库 | MUI v5 + Tailwind CSS | 暗色主题界面 |
 | 图表 | Recharts | Φ-极坐标图、热力图 |
-| 状态管理 | React Hooks | 局部状态 |
+| 状态管理 | React Context + Hooks | Auth/Wallet 上下文 |
+| 实时推送 | SSE (Server-Sent Events) | 事件流 |
 | 测试框架 | Vitest | 单元测试（113 项） |
 | 构建工具 | Vite 5 | 前端快速构建 |
 
@@ -430,8 +622,10 @@ atex-exchange/
 - **Φ-算符：** 复数 Φ-值运算，驱动动态定价与共识梯度
 - **Φ-Gateway：** 四级决策拦截（DID 验证 → 意图预测 → 反相检测 → 刘路由）
 - **TAI（交易即发行）：** 碳硅纠缠网络，实现交易驱动的通证发行
+- **DAG 共识：** 异步最终一致性，2/3 验证者确认
 - **三旋风控：** 面旋（利率）/ 体旋（准备金）/ 线旋（链上锁仓）三维风险模型
-- **139 相变：** 紫外正规化奇点消除，保障系统稳定性
+- **139 相变：** 紫外正规化奇点消除 + CUSUM/EWMA 自动校准
+- **相位索引：** 64 桶离散化，撮合复杂度 O(n)→O(log n)
 
 > 详细理论参见学术论文：《AgentWeb Token 交易所：基于流贯动力学与 Φ-算符的设计与实现》
 
@@ -439,10 +633,9 @@ atex-exchange/
 
 ## 联系方式与贡献
 
-- **项目主页：** https://github.com/your-org/atex-exchange
-- **Issue 追踪：** https://github.com/your-org/atex-exchange/issues
-- **学术合作：** contact@atex-exchange.org
-- **论文投稿：** 待投稿（基于太乙AGI V7.12 理论框架）
+- **项目主页：** https://github.com/lisoleg/atex-exchange
+- **Issue 追踪：** https://github.com/lisoleg/atex-exchange/issues
+- **学术论文：** 待投稿（基于太乙AGI V7.12 理论框架）
 
 ---
 
