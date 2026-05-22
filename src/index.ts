@@ -29,6 +29,9 @@ import streamRoutes, { getConnectedClients } from './api/routes/stream.routes';
 import paymentRoutes from './api/routes/payment.routes';
 import kyaRoutes from './api/routes/kya.routes';
 
+// V3.1 新增路由（性能优化 + 开放问题）
+import matchingRoutes from './api/routes/matching.routes';
+
 const app = express();
 const prisma = new PrismaClient();
 
@@ -87,6 +90,9 @@ app.use(`${API_PREFIX}/stream`, streamRoutes);
 // API 路由 — V3 新增（AEON 借鉴）
 app.use(`${API_PREFIX}/payment`, paymentRoutes);
 app.use(`${API_PREFIX}/kya`, kyaRoutes);
+
+// API 路由 — V3.1 新增（性能优化 + 开放问题）
+app.use(`${API_PREFIX}/matching`, matchingRoutes);
 
 // 状态 API
 app.get(`${API_PREFIX}/status`, async (_req, res) => {
