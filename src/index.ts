@@ -25,6 +25,10 @@ import agentRoutes from './api/routes/agent.routes';
 import apikeyRoutes from './api/routes/apikey.routes';
 import streamRoutes, { getConnectedClients } from './api/routes/stream.routes';
 
+// V3 新增路由（AEON 借鉴）
+import paymentRoutes from './api/routes/payment.routes';
+import kyaRoutes from './api/routes/kya.routes';
+
 const app = express();
 const prisma = new PrismaClient();
 
@@ -52,8 +56,10 @@ app.get('/health', (_req, res) => {
   res.json({
     status: 'ok',
     service: 'ATEX - AgentWeb Token Exchange',
-    version: '2.0.0',
+    version: '3.0.0',
     auth: { webAuthn: true, jwt: true, apiKey: true },
+    x402: true,
+    kya: true,
     sseClients: getConnectedClients(),
     federation,
     holoboundary: {
@@ -77,6 +83,10 @@ app.use(`${API_PREFIX}/wallet`, walletRoutes);
 app.use(`${API_PREFIX}/agent`, agentRoutes);
 app.use(`${API_PREFIX}/apikey`, apikeyRoutes);
 app.use(`${API_PREFIX}/stream`, streamRoutes);
+
+// API 路由 — V3 新增（AEON 借鉴）
+app.use(`${API_PREFIX}/payment`, paymentRoutes);
+app.use(`${API_PREFIX}/kya`, kyaRoutes);
 
 // 状态 API
 app.get(`${API_PREFIX}/status`, async (_req, res) => {

@@ -1,7 +1,25 @@
-# ATEX V2 — 交付概览
+# ATEX V3.0 — 交付概览
 
 ## TL;DR
-基于西格玛云四元Token统一场论的全栈交易所（ATEX）已完成开发，包含后端 Express+Prisma+SQLite、前端 React+MUI+Recharts、113 项单元测试全部通过。
+基于太乙AGI统一场论的全栈交易所 ATEX V3.0，借鉴 AEON Agent 经济模型，新增 x402 支付协议、KYA 信用系统、A2A 协商、碳硅纠缠（人机委托）、交易加密证明。Agent-First 设计，支持生物识别登录 + 多钱包 + Web2 体验。
+
+## 四层架构
+
+```
+┌──────────────────────────────────────────────────┐
+│  Layer 4: Agent Economy  ← AEON 借鉴             │
+│  (x402 + KYA + A2A + 委托 + 证明)               │
+├──────────────────────────────────────────────────┤
+│  Layer 3: AI Agent SDK    ← HEADLESS API-first   │
+│  (API Key + JWT + SSE + Agent RPC)               │
+├──────────────────────────────────────────────────┤
+│  Layer 2: Human Web App    ← Web2 舒适体验        │
+│  (生物DID登录 + 多钱包 + 流畅UI)                 │
+├──────────────────────────────────────────────────┤
+│  Layer 1: Auth & Wallet Core ← 安全基座           │
+│  (WebAuthn + Passkey + TSS + MPC)                │
+└──────────────────────────────────────────────────┘
+```
 
 ## 交付状态
 
@@ -10,84 +28,121 @@
 | 后端 TypeScript 编译 | ✅ 零错误 |
 | 前端 TypeScript 编译 | ✅ 零错误 |
 | 单元测试 (7 文件 / 113 项) | ✅ 全部通过 |
-| 前端生产构建 | ✅ 810KB JS + 6.3KB CSS |
-| Prisma 数据库迁移 | ✅ SQLite 初始化完成 |
+| Prisma 数据库迁移 | ✅ 含 Delegation/DelegationAuditLog 模型 |
+| GitHub 推送 | ✅ https://github.com/lisoleg/atex-exchange |
+
+## V3 新增（借鉴 AEON）
+
+### x402 支付协议（借鉴 AEON Protocol Kernel）
+- HTTP 402 Payment Required 中间件
+- X-PAYMENT / X-PAYMENT-RESPONSE 头部标准
+- 支付验证与结算服务
+- 可验证收据（ERC-8004 风格：交易证明 + 用途证明 + 授权证明）
+
+### KYA 信用系统（借鉴 AEON KYA）
+- 5 维信用因子：交易历史(30%) + Φ值稳定性(25%) + 钱包安全(20%) + DID验证(15%) + 活跃时间(10%)
+- 6 级信用等级：UNRATED → BRONZE → SILVER → GOLD → PLATINUM → DIAMOND
+- Agent 信用报告 API
+
+### A2A 协议（借鉴 AEON Agent-to-Agent）
+- Agent 间协商（报价/还价）
+- 人类委托 AI 代理执行交易
+- 批量执行增强（依赖链 + 条件分支）
+- 交易加密证明（三重证明）
+
+### 碳硅纠缠（人机委托）
+- 委托关系管理（创建/查询/撤销）
+- 代理权限分级
+- 操作审计日志
+- 金额限制和追踪
+
+## 完整 API 端点
+
+| 端点 | 说明 | 版本 |
+|------|------|------|
+| POST /api/v1/auth/register-options | WebAuthn 注册选项 | V2 |
+| POST /api/v1/auth/register | 注册 + 登录 | V2 |
+| POST /api/v1/auth/login-options | WebAuthn 登录选项 | V2 |
+| POST /api/v1/auth/login | WebAuthn 登录 | V2 |
+| POST /api/v1/auth/dev-login | 开发模式登录 | V2 |
+| POST /api/v1/auth/refresh | 刷新 JWT | V2 |
+| POST /api/v1/auth/logout | 注销 | V2 |
+| GET /api/v1/auth/me | 当前用户信息 | V2 |
+| GET /api/v1/wallet | 列出钱包 | V2 |
+| POST /api/v1/wallet/create | 创建钱包 | V2 |
+| PUT /api/v1/wallet/migrate | 迁移钱包类型 | V2 |
+| POST /api/v1/wallet/backup | 导出备份 | V2 |
+| GET /api/v1/wallet/balance | 钱包余额 | V2 |
+| POST /api/v1/agent/execute | Agent 批量执行（V3：依赖链） | V3 |
+| POST /api/v1/agent/negotiate | A2A 协商 | V3 |
+| POST /api/v1/agent/delegate | 委托 AI 代理 | V3 |
+| POST /api/v1/agent/prove | 交易加密证明 | V3 |
+| GET /api/v1/agent/capabilities | Agent 能力查询 | V3 |
+| GET /api/v1/agent/stream | SSE 事件流 | V2 |
+| POST /api/v1/payment/verify | x402 支付验证 | V3 |
+| POST /api/v1/payment/settle | x402 支付结算 | V3 |
+| GET /api/v1/payment/routes | x402 付费路由列表 | V3 |
+| GET /api/v1/kya/credit | KYA 信用报告 | V3 |
+| GET /api/v1/kya/credit/:did | 查询他人信用 | V3 |
+| POST /api/v1/apikey | 创建 API Key | V2 |
+| GET /api/v1/apikey | 列出 API Key | V2 |
+| DELETE /api/v1/apikey/:id | 吊销 API Key | V2 |
+| GET /api/v1/stream | 全局 SSE 流 | V2 |
 
 ## 文件清单
 
-### 后端核心 (src/)
-| 模块 | 文件 | 说明 |
-|------|------|------|
-| 数学引擎 | `math/emlPhi.ts` | Φ-值复数运算 (constructPhi, extractPhi, calculatePhiDiff, dynamicPrice, consensusGradient...) |
-| 数学引擎 | `math/jitterSlippage.ts` | Jitter 滑点模型 |
-| 数学引擎 | `math/ouMeanReversion.ts` | O-U 均值回归反通胀 |
-| 数学引擎 | `math/phaseTransition139.ts` | 139 相变奇点检测 |
-| 数学引擎 | `math/resonance369.ts` | 369 振动模态 |
-| 数学引擎 | `math/triSpinRisk.ts` | 三旋风控 (面旋/体旋/线旋) |
-| 核心算法 | `core/phaseEntangle.ts` | 相位缠绕算法 |
-| 核心算法 | `core/topologicalPhaseTransition.ts` | 拓扑相变算法 |
-| 核心算法 | `core/tokenLifecycle.ts` | Token 生命周期状态机 |
-| API 路由 | `api/routes/offer.routes.ts` | POST /offer 创建报价 |
-| API 路由 | `api/routes/accept.routes.ts` | POST /accept/:offerId 接受报价 |
-| API 路由 | `api/routes/cancel.routes.ts` | POST /cancel/:offerId 取消报价 |
-| API 路由 | `api/routes/history.routes.ts` | GET /history 查询历史 |
-| API 路由 | `api/routes/orderbook.routes.ts` | GET /orderbook 订单簿 |
-| 中间件 | `api/middleware/errorHandler.ts` | 统一错误处理 |
-| 中间件 | `api/middleware/phiGateway.ts` | Φ-Gateway 四级决策拦截 |
-| 网关 | `gateway/phiGatewayEngine.ts` | Φ-Gateway 决策引擎 |
-| 网关 | `gateway/didVerifier.ts` | DID 验证器 |
-| 网关 | `gateway/intentPredictor.ts` | 意图预测器 |
-| 网关 | `gateway/antiPhaseDetector.ts` | 反相检测器 |
-| 联邦 | `federation/activityPubAdapter.ts` | ActivityPub 适配器 |
-| 联邦 | `federation/offerActivity.ts` | Offer Activity 处理 |
-| 联邦 | `federation/acceptActivity.ts` | Accept Activity 处理 |
-| 联邦 | `federation/liuRouter.ts` | 刘路由表 |
-| 共识 | `consensus/taiEngine.ts` | TAI (交易即发行) 引擎 |
-| 共识 | `consensus/carbonSiliconNet.ts` | 碳硅纠缠网络 |
-| 共识 | `consensus/holoboundaryStore.ts` | 全息边界存储 |
-| 数据模型 | `models/token.model.ts` | Token Prisma CRUD |
-| 数据模型 | `models/offer.model.ts` | Offer Prisma CRUD |
-| 数据模型 | `models/transaction.model.ts` | Transaction Prisma CRUD |
-| 类型 | `types/atex.types.ts` | 全局类型/枚举定义 |
-| 配置 | `config/atex.config.ts` | ATEX 运行配置 |
-| 入口 | `index.ts` | Express 服务器入口 |
+### 后端 — V3 新增 (6 个文件)
+- `src/payment/x402.types.ts` — x402 协议类型定义
+- `src/payment/x402.middleware.ts` — HTTP 402 支付中间件
+- `src/payment/x402.service.ts` — 支付验证/结算/收据服务
+- `src/kya/kya.service.ts` — KYA 信用系统
+- `src/api/routes/payment.routes.ts` — 支付路由
+- `src/api/routes/kya.routes.ts` — KYA 路由
+- `src/wallet/delegation.service.ts` — 碳硅纠缠委托服务
 
-### 前端 (frontend/src/)
-| 模块 | 文件 | 说明 |
-|------|------|------|
-| 组件 | `components/Layout.tsx` | 暗色主题布局 + 抽屉导航 |
-| 组件 | `components/PhiStatusBar.tsx` | Φ-Gateway 状态栏 |
-| 组件 | `components/TokenBalanceCard.tsx` | 四元Token余额卡片 |
-| 组件 | `components/PhasePolarChart.tsx` | Φ-极坐标雷达图 |
-| 组件 | `components/OfferForm.tsx` | 交易报价表单 |
-| 组件 | `components/OrderBookTable.tsx` | 订单簿表格 |
-| 组件 | `components/PhaseHeatmap.tsx` | Φ-热力图 |
-| 组件 | `components/TransactionTable.tsx` | 交易历史表格 |
-| 页面 | `pages/Dashboard.tsx` | 总览仪表盘 |
-| 页面 | `pages/Trade.tsx` | 交易页面 |
-| 页面 | `pages/Liquidity.tsx` | 流动性页面 |
-| 页面 | `pages/History.tsx` | 历史查询页面 |
-| 页面 | `pages/Settings.tsx` | 设置页面 |
-| Hooks | `hooks/useAtexApi.ts` | API 调用 Hook |
-| Hooks | `hooks/usePhiValue.ts` | Φ-值计算 Hook |
-| 工具 | `utils/phiMath.ts` | 前端 Φ 数学工具 |
-| 工具 | `utils/tokenUtils.ts` | Token 工具函数 |
+### 后端 — V3 修改
+- `prisma/schema.prisma` — 新增 Delegation/DelegationAuditLog 模型
+- `src/index.ts` — 注册 payment/kya 路由，版本升级至 3.0.0
+- `src/api/routes/agent.routes.ts` — 新增 negotiate/delegate/prove 端点，execute 增强依赖链
 
-### 测试 (tests/)
-| 文件 | 测试数 | 说明 |
-|------|--------|------|
-| `math/emlPhi.test.ts` | 21 | Φ-值复数运算测试 |
-| `math/jitterSlippage.test.ts` | 12 | Jitter 滑点测试 |
-| `math/triSpinRisk.test.ts` | 18 | 三旋风控测试 |
-| `core/tokenLifecycle.test.ts` | 29 | Token 生命周期状态机测试 |
-| `core/phaseEntangle.test.ts` | 11 | 相位缠绕算法测试 |
-| `core/topologicalPhaseTransition.test.ts` | 9 | 拓扑相变算法测试 |
-| `api/offer.test.ts` | 13 | Offer API 逻辑测试 |
+### 后端 — V2 文件 (11 个)
+- `src/auth/jwt.service.ts` / `src/auth/webauthn.service.ts`
+- `src/api/middleware/auth.middleware.ts`
+- `src/api/routes/{auth,wallet,agent,apikey,stream}.routes.ts`
+- `src/wallet/{custodial,threshold,self-custody}.service.ts`
+
+### 前端 (11 个)
+- `contexts/{Auth,Wallet}Context.tsx`
+- `components/{AuthGuard,ErrorBoundary,SkeletonCard}.tsx`
+- `pages/{Login,Onboarding,Wallet,AgentApi,NotFound}Page.tsx`
+- `hooks/useEventSource.ts`
+
+## AEON 借鉴对比
+
+| AEON 特性 | ATEX 实现 | 对应文件 |
+|-----------|-----------|---------|
+| x402 Protocol Kernel | HTTP 402 支付中间件 + X-PAYMENT 头 | `src/payment/x402.*` |
+| Distributed Trust Hub | Φ-Gateway 验证 + 原子终局性 | `x402.service.ts` |
+| ERC-8004 可验证收据 | 三重加密证明（交易+用途+授权） | `x402.service.ts` |
+| KYA 信用系统 | 5维因子 + 6级信用 | `src/kya/kya.service.ts` |
+| A2A 交互 | negotiate/delegate/prove 端点 | `agent.routes.ts` |
+| Agent 支付 | 四元 Token 结算 | `x402.service.ts` |
+| 碳硅纠缠（人机协作） | Delegation + 审计日志 | `delegation.service.ts` |
+
+## 钱包模式
+
+| 模式 | 私钥位置 | 安全级别 | 适用场景 |
+|------|---------|---------|---------|
+| 托管 (CUSTODIAL) | 服务端 AES-256-GCM | ★★★ | 新手、快速上手 |
+| 门限 (THRESHOLD) | 2-of-3 MPC 分片 | ★★★★ | 安全与便捷平衡 |
+| 自托管 (SELF_CUSTODY) | 仅浏览器 IndexedDB | ★★★★★ | 高级用户、完全自主 |
 
 ## 用户下一步建议
 
-1. **启动后端**: `npm run dev` → Express 服务运行于 http://localhost:3001
-2. **启动前端**: `cd frontend && npm run dev` → Vite 开发服务器 http://localhost:5173
-3. **预览生产构建**: `cd frontend && npx vite preview` → http://localhost:4173
-4. **运行测试**: `npx vitest run`
-5. **数据库管理**: `npx prisma studio` 打开 SQLite 可视化管理
+1. **启动**: `npm run dev` + `cd frontend && npm run dev`
+2. **开发登录**: 访问 http://localhost:5173 → 点击"开发模式登录"
+3. **创建钱包**: 登录后选择钱包类型（推荐门限钱包）
+4. **KYA 信用**: `GET /api/v1/kya/credit` 查看信用报告
+5. **A2A 协商**: `POST /api/v1/agent/negotiate` Agent 间协商
+6. **x402 支付**: `POST /api/v1/payment/settle` 执行 Token 结算
+7. **委托代理**: `POST /api/v1/agent/delegate` 委托 AI Agent

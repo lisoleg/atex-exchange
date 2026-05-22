@@ -29,6 +29,8 @@ model Agent {
   sessions     Session[]
   apiKeys      ApiKey[]
   wallets      Wallet[]
+  principalDelegations Delegation[]   @relation("PrincipalDelegations")
+  delegateDelegations  Delegation[]   @relation("DelegateDelegations")
 }
 
 // Token (SQLite不支持enum，使用String + 应用层校验)
@@ -125,7 +127,39 @@ model ApiKey {
   agent Agent @relation(fields: [agentId], references: [id])
 }
 
-// Wallet (多钱包)
+// Delegation (人机委托关系)
+// 借鉴 AEON 碳硅纠缠（Carbon-Silicon Bond）
+model Delegation {
+  id           String   @id @default(cuid())
+  principalDid  String                            // 委托人 DID（人类 Agent）
+  agentDid     String                            // 被委托 Agent DID（AI Agent）
+  permissions  String   @default("[]")           // JSON: ["offer:read","offer:write","balance:read"]
+  maxAmount    Float    @default(0)              // 最大可动用金额（0=无限）
+  usedAmount   Float    @default(0)              // 已使用金额
+  description  String?                          // 委托说明
+  isActive     Boolean  @default(true)
+  expiresAt    DateTime                          // 过期时间
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  principal Agent @relation("PrincipalDelegations", fields: [principalDid], references: [did])
+  delegate  Agent @relation("DelegateDelegations", fields: [agentDid], references: [did])
+  auditLogs DelegationAuditLog[]
+}
+
+// DelegationAuditLog (委托操作审计)
+model DelegationAuditLog {
+  id           String   @id @default(cuid())
+  delegationId String
+  action       String                           // 执行的操作
+  did          String                           // 执行者 DID
+  result       String                           // SUCCESS | FAILED
+  detail       String?                          // JSON: 操作详情
+  amount       Float?                           // 涉及金额
+  createdAt    DateTime @default(now())
+
+  delegation Delegation @relation(fields: [delegationId], references: [id])
+}
 model Wallet {
   id           String   @id @default(cuid())
   agentId      String                             // Agent.id
